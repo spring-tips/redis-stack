@@ -1,5 +1,6 @@
 package redis.stackftw;
 
+import com.google.common.io.Files;
 import com.redis.om.spring.annotations.Document;
 import com.redis.om.spring.annotations.EnableRedisDocumentRepositories;
 import com.redis.om.spring.annotations.Indexed;
@@ -12,6 +13,7 @@ import io.redisearch.aggregation.SortedField;
 import lombok.AllArgsConstructor;
 import lombok.Data;
 import lombok.NoArgsConstructor;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.boot.CommandLineRunner;
 import org.springframework.boot.SpringApplication;
 import org.springframework.boot.autoconfigure.SpringBootApplication;
@@ -20,8 +22,10 @@ import org.springframework.data.annotation.Id;
 import org.springframework.data.geo.Distance;
 import org.springframework.data.geo.Point;
 import org.springframework.data.redis.domain.geo.Metrics;
+import org.springframework.util.Assert;
 
-import java.util.Arrays;
+import java.io.File;
+import java.nio.charset.StandardCharsets;
 import java.util.Collection;
 import java.util.stream.Collectors;
 
@@ -32,30 +36,28 @@ public class StackftwApplication {
 
     @Bean
     CommandLineRunner commandLineRunner(
+            @Value("file:///${HOME}/Desktop/data.csv") File dataFile,
             EntityStream stream,
             RedisModulesOperations<String, Object> redisModulesOperations,
             PersonRepository repository) {
         return args -> {
+
+
             redisModulesOperations.opsForSearch(Person.class.getName() + "Idx");
             repository.deleteAll();
-            var data = Arrays.stream("""
-                            Brian,Sam-Bodden,40,-122.066540, 37.377690
-                            Tam,Koon,36,-122.124500, 47.640160
-                            Josh,Long,38,38.7635877,-9.2018309
-                            Jose,Lat,49,38.7205373,-9.148091
-                            Jose,Lat,35,37.0990749,-8.6868258
-                            Joshua,Long,30,37.0990749,-8.6868258
-                            """
-                            .split(System.lineSeparator()))
-                    .toList()
+
+            var data = Files
+                    .readLines(dataFile, StandardCharsets.UTF_8)
                     .stream()
                     .map(l -> l.split(","))
                     .map(ar -> new Person(null, ar[0], ar[1], Integer.parseInt(ar[2]),
                             new Point(Double.parseDouble(ar[3].trim()), Double.parseDouble(ar[4].trim()))))
                     .toList();
             repository.saveAll(data);
+
             log(repository.findByFirstName("Brian"));
             log(repository.findByAgeBetween(35, 40));
+            //
             log(repository.search("jo*"));
             log(repository.findByFirstNameAndLastName("Tam", "Koon"));
             log(repository.findByFirstNameAndLastName("Brian", "Sam*"));
